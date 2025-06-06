@@ -1,0 +1,1075 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator nexusPrisma {
+  provider = "nexus-prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// User model
+model User {
+  id                String              @id @default(uuid())
+  phone             String?             @default("")
+  pendingPhone      String?
+  phoneVerified     Boolean             @default(false)
+  email             String?             @default("")
+  pendingEmail      String?
+  emailVerified     Boolean             @default(false)
+  currency          String              @default("USD")
+  firstName         String?
+  lastName          String?
+  photo             String?
+  username          String?
+  referralLink      String?             @unique
+  isActive          Boolean             @default(false)
+  timezone          String?
+  ipDetails         Json?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  userType          UserType            @default(USER)
+  ads               Ad[]
+  config            Config?
+  copyTrades        CopyTrade[]
+  cryptoWallet      CryptoWallet?
+  FiatTransaction   FiatTransaction[]
+  fiatWallets       FiatWallet[]
+  otps              Otp[]
+  Saving            Saving[]
+  Subscription      SubscriptionPlan[]
+  received          Transaction[]       @relation("receiver")
+  comments          Comment[]
+  reactions         Reaction[]
+  vaultLedger       VaultLedger[]
+  TokenHolding      TokenHolding[]
+  UserBalance       UserBalance[]
+  AuditTrail        AuditTrail[]
+  cryptoTransaction CryptoTransaction[]
+  platformFees      PlatformFee[]
+  referralUsage     ReferralUsage[]
+  referral          Referral[]
+  ApiKeys           ApiKey[]
+  Notification      Notification[]
+}
+
+model Config {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  theme     String?
+  language  String?
+  timezone  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Otp {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String
+  type      OtpType
+  isUsed    Boolean  @default(false)
+  expiresAt DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+/// Country model
+model Country {
+  id             String          @id @default(uuid())
+  name           String          @unique
+  code           String          @unique
+  dial           String?         @default("")
+  flag           String?         @default("")
+  currency       String?         @default("")
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  fiat           Fiat?
+  paymentMethods PaymentMethod[]
+}
+
+/// Fiat  model
+model Fiat {
+  id              String            @id @default(uuid())
+  name            String            @unique
+  symbol          String            @unique
+  countryId       String            @unique
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  ads             Ad[]              @relation("Ad")
+  country         Country           @relation(fields: [countryId], references: [id])
+  FiatTransaction FiatTransaction[]
+  fiatWallets     FiatWallet[]
+  rates           Rate[]
+  Saving          Saving[]
+  transactions    Transaction[]     @relation("Transaction")
+}
+
+model FiatWallet {
+  id        String       @unique @default(uuid())
+  userId    String
+  fiatId    String
+  balance   Float        @default(0.0)
+  lockedBal Float        @default(0.0)
+  status    WalletStatus @default(Open)
+  type      WalletType   @default(Current)
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  fiat      Fiat         @relation(fields: [fiatId], references: [id])
+  user      User         @relation(fields: [userId], references: [id])
+  Saving    Saving?
+
+  @@unique([userId, fiatId], name: "fiatWalletId")
+}
+
+/// Payment method model
+model PaymentMethod {
+  id           String        @id @default(uuid())
+  name         String        @unique
+  category     String
+  countryId    String?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  country      Country?      @relation(fields: [countryId], references: [id])
+  transactions Transaction[]
+  ads          Ad[]          @relation("AdToPaymentMethod")
+}
+
+/// Coin model
+model Coin {
+  id           String        @id @default(uuid())
+  name         String
+  symbol       String        @unique
+  networkId    Int
+  status       CoinStatus    @default(Listed)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  ads          Ad[]          @relation("Ad")
+  network      Network       @relation(fields: [networkId], references: [id])
+  transactions Transaction[] @relation("Transaction")
+}
+
+/// Network model
+model Network {
+  id            Int            @id
+  name          String         @unique
+  symbol        String         @unique
+  explorer      String
+  nativeToken   String
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  coins         Coin[]
+  cryptoWallets CryptoWallet[]
+}
+
+model CryptoWallet {
+  id        String         @id @default(uuid())
+  userId    String         @unique
+  networkId Int
+  mnemonic  String
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  accounts  CryptoAccount?
+  network   Network        @relation(fields: [networkId], references: [id])
+  user      User           @relation(fields: [userId], references: [id])
+}
+
+model CryptoAccount {
+  id             String       @id @default(uuid())
+  cryptoWalletId String       @unique
+  address        String
+  privateKey     String
+  status         WalletStatus @default(Open)
+  type           WalletType   @default(Current)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  cryptoWallet   CryptoWallet @relation(fields: [cryptoWalletId], references: [id])
+  Saving         Saving?
+}
+
+/// Ad model
+model Ad {
+  /// Unique identifier for the ad
+  id             String          @id @default(uuid())
+  /// Id of the advertiser of the ad
+  advertiserId   String
+  /// Price of the ad
+  price          Float
+  /// Id of the fiat currency that the `advertiser` is selling or buying crypto
+  fiatId         String
+  /// Id of the coin that the `advertiser` is selling or buying
+  coinId         String
+  /// Minimum limit of the ad; the minimum amount that can be traded
+  limit          Float
+  /// Maximum limit of the ad; the maximum amount that can be traded; means available balance
+  available      Float
+  /// Side of the transaction
+  side           Side
+  /// Completes transaction within the specified duration
+  duration       Int
+  /// Terms and conditions of the ad
+  terms          String          @default("Make payment before marking as paid. Use third party at your own risk.")
+  /// Status of the ad
+  isActive       Boolean         @default(true)
+  /// Date and time when the ad was created
+  createdAt      DateTime        @default(now())
+  /// Date and time when the ad was last updated
+  updatedAt      DateTime        @updatedAt
+  advertiser     User            @relation(fields: [advertiserId], references: [id])
+  coin           Coin            @relation("Ad", fields: [coinId], references: [id])
+  fiat           Fiat            @relation("Ad", fields: [fiatId], references: [id])
+  transactions   Transaction[]   @relation("Transaction")
+  paymentMethods PaymentMethod[] @relation("AdToPaymentMethod")
+  isApproved     Boolean?        @default(false)
+}
+
+/// Transaction model
+model Transaction {
+  /// Unique identifier for the transaction
+  id              String            @id @default(uuid())
+  /// Unique identifier for the transaction
+  invoiceNumber   String            @unique @default(cuid())
+  /// Unique identifier for the transaction
+  paymentSecureId String?
+  /// Phone number of the receiver, used to send M-Pesa STK push
+  phone           String
+  /// Type of transaction
+  type            TransactionType   @default(P2P)
+  /// Id of the Ad that the transaction is related to
+  adId            String
+  /// Id of the user that initiated the transaction
+  receiverId      String
+  /// Address of the receiver; used for sending crypto
+  receiverAddress String
+  /// Amount of the transaction in fiat
+  amount          Float
+  /// Amount of the transaction in fiat that was received
+  amountReceived  Float             @default(0)
+  /// Amount of the transaction in crypto
+  quantity        Float             @default(0)
+  /// Id of the fiat currency that the `receiver` is sending or receiving when buying or selling crypto respectively
+  fiatId          String
+  /// Id of the coin that the `receiver` is receiving or sending when buying or selling crypto respectively
+  coinId          String
+  /// Id of the payment method used for the transaction
+  paymentMethodId String
+  /// Payment URL that the is sent to the receiver to make payment if payment method is card
+  paymentUrl      String            @default("")
+  /// Optional note for the transaction
+  note            String            @default("")
+  /// Status of the transaction
+  status          TransactionStatus @default(Pending)
+  /// Date and time when the transaction was created
+  createdAt       DateTime          @default(now())
+  /// Date and time when the transaction was last updated
+  updatedAt       DateTime          @updatedAt
+  PaymentLine     PaymentLine[]
+  ad              Ad                @relation("Transaction", fields: [adId], references: [id])
+  coin            Coin              @relation("Transaction", fields: [coinId], references: [id])
+  fiat            Fiat              @relation("Transaction", fields: [fiatId], references: [id])
+  paymentMethod   PaymentMethod     @relation(fields: [paymentMethodId], references: [id])
+  receiver        User              @relation("receiver", fields: [receiverId], references: [id])
+}
+
+model FiatTransaction {
+  id              String               @id @default(uuid())
+  invoiceNumber   String?              @unique @default(cuid())
+  userId          String
+  amount          Float                @default(0.0)
+  amountUSD       Float?
+  fiatId          String
+  status          TransactionStatus    @default(Pending)
+  type            TransactionType      @default(Deposit)
+  direction       TransactionDirection @default(Incoming)
+  transactionInfo TransactionInfo      @default(Wallet)
+  exchangeRate    Float?
+  transferMethod  TransferMethod?
+  narations       String?
+  extra_data      String?              @default("")
+  isActive        Boolean              @default(true)
+  isClaimed       Boolean              @default(false)
+  paymentSecureId String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  phone           String?
+  fiat            Fiat                 @relation(fields: [fiatId], references: [id])
+  user            User                 @relation(fields: [userId], references: [id])
+  paymentLines    PaymentLine[]
+  Subscription    SubscriptionPlan[]
+}
+
+model PaymentLine {
+  id                String           @id @default(uuid())
+  paidOn            DateTime
+  amount            Float            @default(0.0)
+  photo             String?
+  fiatTransactionId String?
+  transactionId     String?
+  fiatTransaction   FiatTransaction? @relation(fields: [fiatTransactionId], references: [id])
+  Transaction       Transaction?     @relation(fields: [transactionId], references: [id])
+}
+
+model RateCategory {
+  id            String         @id @default(uuid())
+  name          String         @unique
+  description   String?
+  icon          String?
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  rateProviders RateProvider[]
+}
+
+model RateProvider {
+  id             String        @id @default(uuid())
+  name           String        @unique
+  icon           String?
+  country        String
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  rateCategoryId String?
+  rates          Rate[]
+  rateCategory   RateCategory? @relation(fields: [rateCategoryId], references: [id])
+}
+
+model Rate {
+  id             String       @id @default(uuid())
+  fiatId         String
+  rateProviderId String
+  buy            Float
+  sell           Float
+  datePosted     DateTime
+  monthlyChange  Float
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  fiat           Fiat         @relation(fields: [fiatId], references: [id])
+  rateProvider   RateProvider @relation(fields: [rateProviderId], references: [id])
+}
+
+model CryptoRate {
+  id               String   @id @default(uuid())
+  market           String   @unique
+  price            Float
+  percentageChange Float
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Session {
+  id             String   @id @default(uuid())
+  mamlakaSession String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model PostSource {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  icon      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  posts     Post[]
+}
+
+model PostImpressions {
+  id        String   @id @default(uuid())
+  postId    String   @unique
+  likes     Int
+  disLikes  Int
+  shares    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  post      Post     @relation("PostImpressionsToPost", fields: [postId], references: [id])
+}
+
+model Post {
+  id           String           @id @default(uuid())
+  author       String
+  title        String
+  summary      String
+  link         String
+  image        String
+  category     PostCategory
+  topic        PostTopic
+  status       PostStatus       @default(Draft)
+  postSourceId String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  source       PostSource?      @relation(fields: [postSourceId], references: [id])
+  impressions  PostImpressions? @relation("PostImpressionsToPost")
+}
+
+model Trader {
+  id                 String               @id @default(uuid())
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  name               String               @unique
+  yearOfExperience   Float
+  tradingStyle       TradingStyle
+  averageReturn      String
+  platform           Platform
+  followers          Int
+  tradesCopied       Int
+  successRate        String
+  riskLevel          RiskLevel
+  bio                String?
+  photo              String?
+  contact            Contact[]
+  performanceHistory PerformanceHistory[]
+  strategies         Strategy[]
+}
+
+// followers
+model CopyTrade {
+  id                 String            @id @default(uuid())
+  shillId            String?
+  amount             Float
+  userId             String
+  leverage           Int
+  period             Int
+  status             CopyStatus        @default(Pending)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  TradeInformationId String?
+  closedPnl          Float?
+  netReturn          Float?
+  image              String?
+  TradeInformation   TradeInformation? @relation(fields: [TradeInformationId], references: [id])
+  shiller            Shill?            @relation(fields: [shillId], references: [id])
+  user               User              @relation(fields: [userId], references: [id])
+}
+
+model TradeInformation {
+  id               String     @id @default(uuid())
+  tradeId          String
+  bybitOrderId     String     @unique
+  pnl              Float      @default(0.0)
+  unrealizedProfit Float
+  realizedProfit   Float
+  totalInvestment  Float
+  totalReturn      Float      @default(0.0)
+  side             OrderSide?
+  status           String?
+  orderType        String?
+  currentPrice     Float?
+  closedSize       Float?
+  takeProfit       Float?
+  stopLoss         Float?
+  cumEntryValue    Float?
+  avgEntryPrice    Float?
+  cumExitValue     Float?
+  avgExitPrice     Float?
+  closedPnl        Float?
+  fillCount        Float?
+  quantity         Float?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  trade      Trade       @relation(fields: [tradeId], references: [id])
+  copyTrades CopyTrade[]
+}
+
+model Notification {
+  id            String               @id @default(uuid())
+  userId        String
+  type          NotificationType     @default(InApp)
+  status        NotificationStatus   @default(Unread)
+  category      NotificationCategory
+  title         String
+  body          Json
+  externalError Json?
+  createdAt     DateTime             @default(now())
+  readAt        DateTime             @updatedAt
+  user          User                 @relation(fields: [userId], references: [id])
+}
+
+model Strategy {
+  id            String    @id @default(uuid())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  traderId      String
+  strategyId    String
+  name          String
+  description   String
+  averageReturn String
+  riskLevel     RiskLevel
+  trade         Trader    @relation(fields: [traderId], references: [id])
+}
+
+model Contact {
+  id        String   @id @default(uuid())
+  traderId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  email     String
+  twitter   String
+  linkedin  String
+  trader    Trader   @relation(fields: [traderId], references: [id])
+}
+
+model PerformanceHistory {
+  id                 String               @id @default(uuid())
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  year               String
+  traderId           String
+  monthlyPerformance MonthlyPerformance[]
+  trader             Trader               @relation(fields: [traderId], references: [id])
+}
+
+model MonthlyPerformance {
+  id            String             @id @default(uuid())
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  month         Month
+  percentage    String
+  performanceId String
+  performance   PerformanceHistory @relation(fields: [performanceId], references: [id])
+}
+
+model SubscriptionPlan {
+  id                String              @id @default(uuid())
+  userId            String
+  type              SubscriptionType    @default(Rate)
+  package           SubscriptionPackage @default(Monthly)
+  startDate         DateTime            @default(now())
+  endDate           DateTime
+  isActive          Boolean             @default(false)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  fiatTransactionId String?
+  fiatTransaction   FiatTransaction?    @relation(fields: [fiatTransactionId], references: [id])
+  user              User                @relation(fields: [userId], references: [id])
+}
+
+model Saving {
+  id              String         @id @default(uuid())
+  name            String
+  userId          String
+  amount          Float
+  amountEarned    Float?
+  duration        SavingDuration @default(Yearly)
+  fiatWalletId    String         @unique
+  cryptoAccountId String?        @unique
+  fiatId          String
+  isActive        Boolean        @default(true)
+  isCryptoAccount Boolean        @default(false)
+  isMatured       Boolean        @default(false)
+  maturedAt       DateTime
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  cryptoAccount   CryptoAccount? @relation(fields: [cryptoAccountId], references: [id])
+  fiat            Fiat           @relation(fields: [fiatId], references: [id])
+  fiatWallet      FiatWallet     @relation(fields: [fiatWalletId], references: [id])
+  user            User           @relation(fields: [userId], references: [id])
+}
+
+model CurrencyRateCache {
+  id           String   @id @default(uuid())
+  currencyPair String   @unique
+  code         String
+  rate         Float
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Shill {
+  id            String      @id @default(uuid())
+  name          String      @unique
+  tradeCount    String?     @default("0")
+  photo         String?     @default("")
+  pnlLoss       String?     @default("0")
+  pnlWin        String?     @default("0")
+  maxLoss       String?     @default("0")
+  avgLoss       String?     @default("0")
+  avgProfit     String?     @default("0")
+  maxProfit     String?     @default("0")
+  gross         String?     @default("0")
+  winCount      String?     @default("0")
+  lossCount     String?     @default("0")
+  winRate       String?     @default("0")
+  lossRate      String?     @default("0")
+  winLossRatio  String?     @default("0")
+  winPercentage String?     @default("0")
+  avgVolume     String?
+  date          String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  trades        Trade[]
+  CopyTrade     CopyTrade[]
+}
+
+// Trade Signals
+model Trade {
+  id               String             @id @default(uuid())
+  tradeSignal      OrderSide
+  entryPrice       Float
+  takeProfit       Float
+  stopLoss         Float
+  token            String
+  tokenImage       String?
+  Shill            Shill              @relation(fields: [shillId], references: [id])
+  shillId          String
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  klineData        KlineData[]
+  TradeInformation TradeInformation[]
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  icon      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  feeds     Feed[]
+}
+
+model Feed {
+  id         String     @id @default(uuid())
+  title      String
+  photo      String
+  content    String
+  creator    String?
+  owner      String
+  isActive   Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  category   Category?  @relation(fields: [categoryId], references: [id])
+  categoryId String?
+  isPinned   Boolean    @default(false)
+  comments   Comment[]
+  reactions  Reaction[]
+}
+
+model Comment {
+  id        String     @id @default(uuid())
+  content   String
+  userId    String
+  feedId    String
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [id])
+  feed      Feed       @relation(fields: [feedId], references: [id])
+  reactions Reaction[]
+}
+
+model Reaction {
+  id        String        @id @default(uuid())
+  userId    String
+  feedId    String?
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  type      ReactionType?
+  user      User          @relation(fields: [userId], references: [id])
+  feed      Feed?         @relation(fields: [feedId], references: [id])
+  Comment   Comment?      @relation(fields: [commentId], references: [id])
+  commentId String?
+}
+
+model Referral {
+  id            String          @id @default(uuid())
+  referrerId    String?
+  referrer      User?           @relation(fields: [referrerId], references: [id])
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  referralUsage ReferralUsage[]
+}
+
+model ReferralUsage {
+  id         String    @id @default(uuid())
+  referralId String? // Make this field optional (nullable)
+  referral   Referral? @relation(fields: [referralId], references: [id]) // Make the relation optional
+  userId     String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  user       User      @relation(fields: [userId], references: [id])
+}
+
+// TOKEN HOLDING
+model TokenHolding {
+  id            String        @id @default(uuid())
+  userId        String
+  amount        Float         @default(0.0)
+  status        HoldingStatus @default(Inactive)
+  availableBal  Float         @default(0.0)
+  lockedBal     Float         @default(0.0)
+  isSupported   Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  user          User          @relation(fields: [userId], references: [id])
+  tokenId       String
+  token         Token         @relation(fields: [tokenId], references: [id])
+  VaultLedger   VaultLedger?  @relation(fields: [vaultLedgerId], references: [id])
+  vaultLedgerId String?
+}
+
+// VAULT LEDGER
+model VaultLedger {
+  id                   String         @id @default(uuid())
+  userId               String
+  tokenHoldings        TokenHolding[]
+  balanceAggregatedUSD Float
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  user                 User           @relation(fields: [userId], references: [id])
+}
+
+model Token {
+  id           String         @id @default(uuid())
+  name         String
+  address      String         @unique
+  symbol       String         @unique
+  decimals     Int
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  TokenHolding TokenHolding[]
+}
+
+// Implement of the User Balances Ledger for the platform and users
+model UserBalance {
+  id        String       @id @default(uuid())
+  userId    String
+  balance   Float        @default(0.0)
+  status    WalletStatus @default(Open)
+  type      WalletType   @default(Current)
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  user      User         @relation(fields: [userId], references: [id])
+}
+
+// This fees can be calculated based on the transaction type
+model PlatformFee {
+  id            String          @id @default(uuid())
+  name          String
+  amount        Float
+  isActive      Boolean         @default(true)
+  invoiceNumber String
+  userId        String
+  cashier       User            @relation(fields: [userId], references: [id])
+  createdAt     DateTime        @default(now())
+  fee_type      PlatformFeeType @default(Withdrawal)
+  updatedAt     DateTime        @updatedAt
+}
+
+// audit trail
+model AuditTrail {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String
+  details   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+enum PlatformFeeType {
+  Withdrawal
+  Transfer
+  Refund
+  P2P
+  Gas
+}
+
+enum AuditTrailAction {
+  Create
+  Update
+  Delete
+  Read
+  Withdrawal
+  Deposit
+  Transfer
+  Refund
+  P2P
+}
+
+model CryptoTransaction {
+  id               String            @id @default(uuid())
+  userId           String
+  hash             String            @unique
+  blockNumber      String?
+  timeStamp        String
+  from             String
+  to               String
+  value            Float
+  gas              String
+  gasPrice         String
+  txreceipt_status String?
+  methodId         String?
+  tokenAddress     String?
+  tokenSymbol      String?
+  toSymbol         String?
+  status           TransactionStatus
+  type             TransactionType
+  transferMethod   TransferMethod?
+  confirmations    String?
+  fee              Float?
+  transactionIndex String?
+  gasUsed          String?
+  errorMessage     String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  user             User              @relation(fields: [userId], references: [id])
+}
+
+model ApiKey {
+  id        String        @id @default(uuid())
+  key       String        @unique
+  userId    String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  isActive  Boolean       @default(true)
+  expiresAt DateTime
+  usage     ApiKeyUsage[]
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+model ApiKeyUsage {
+  id         String @id @default(uuid())
+  apiKeyId   String
+  apiKey     ApiKey @relation(fields: [apiKeyId], references: [id])
+  date       String
+  usageCount Int    @default(1)
+
+  @@unique([apiKeyId, date]) // Ensure one usage log per day per API key
+}
+
+model KlineData {
+  id         String   @id @default(uuid())
+  startTime  String
+  openPrice  String
+  highPrice  String
+  lowPrice   String
+  closePrice String
+  symbol     String
+  volume     String
+  turnover   String
+  createdAt  DateTime @default(now())
+  tradeId    String
+  Trade      Trade    @relation(fields: [tradeId], references: [id])
+}
+
+enum UserType {
+  ADMIN
+  USER
+  TRADER
+  INVESTOR
+  CASHIER
+}
+
+enum HoldingStatus {
+  Active
+  Inactive
+}
+
+enum NotificationType {
+  InApp
+  Email
+  SMS
+  Push
+  Telegram
+}
+
+enum NotificationStatus {
+  Sent
+  Read
+  Unread
+}
+
+enum NotificationCategory {
+  General
+  Transaction
+  Subscription
+  Saving
+  Trade
+}
+
+// reaction types
+enum ReactionType {
+  Like
+  Dislike
+  Love
+  Haha
+  Wow
+  Sad
+  Angry
+}
+
+enum OrderSide {
+  Buy
+  Sell
+}
+
+enum SubscriptionType {
+  //TODOS: Add more subscription types i.e masterclass, mentorship, etc
+  Rate
+}
+
+enum CopyStatus {
+  Pending
+  Ongoing
+  Completed
+  Failed
+}
+
+enum SavingDuration {
+  Monthly
+  Weekly
+  Quarterly
+  Yearly
+}
+
+enum SubscriptionPackage {
+  Monthly
+  Quarterly
+  Yearly
+}
+
+enum OtpType {
+  VerifyEmail
+  VerifyPhone
+  ChangePassword
+  ApproveTransaction
+  LoginVerify
+}
+
+enum WalletStatus {
+  Open
+  Suspended
+  Closed
+}
+
+enum WalletType {
+  Current
+  Savings
+  Joint
+}
+
+/// Status of the coin on the platform
+enum CoinStatus {
+  Listed
+  Delisted
+}
+
+/// Side of the transaction
+enum Side {
+  Buy
+  Sell
+}
+
+/// Status of the transaction
+enum TransactionStatus {
+  Pending
+  Completed
+  Failed
+  Cancelled
+}
+
+/// Type of transaction
+enum TransactionType {
+  Deposit
+  Withdrawal
+  Transfer
+  Exchange
+  Payment
+  Refund
+  P2P
+  Request
+  Buy
+  Sell
+  CopyTrade
+}
+
+enum PostStatus {
+  Draft
+  Published
+  Archived
+}
+
+enum PostCategory {
+  Software
+  Design
+  Digital
+}
+
+enum PostTopic {
+  Bootcamp
+  Mentorship
+}
+
+enum TradingStyle {
+  SwingTrading
+  DayTrading
+  Scalping
+  PositionTrading
+}
+
+enum Platform {
+  Bybit
+  Binance
+  Bitmex
+  Kraken
+}
+
+enum RiskLevel {
+  Low
+  Moderate
+  High
+}
+
+enum Month {
+  JAN
+  FEB
+  MAR
+  APR
+  MAY
+  JUN
+  JUL
+  AUG
+  SEP
+  OCT
+  NOV
+  DEC
+}
+
+enum TransactionDirection {
+  Incoming
+  Outgoing
+}
+
+enum TransactionInfo {
+  PushPay
+  Wallet
+}
+
+enum TransferMethod {
+  CARD
+  MPESA
+  INTERNAL
+  USDTOTOKEN
+  TOKENTOUSD
+  CRYPTOSWAP
+}

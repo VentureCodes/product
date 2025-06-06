@@ -1,0 +1,9 @@
+services:
+  postgres:
+    image: postgres:alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: dollarmarkets
+    ports:
+      - '5432:5432'
