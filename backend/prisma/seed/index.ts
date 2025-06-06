@@ -63,6 +63,9 @@ const Main = async () => {
   // const traderId = await traders(prisma)
 
   // console.info('Traders seeded successfully ✓')
+  console.info('Seeding shillers...')
+  await shillers(prisma)
+  console.info('Shillers seeded successfully ✓')
 
   console.info('Seeding copy trades...')
   const copyTradeIds: string[] = []
@@ -94,10 +97,6 @@ const Main = async () => {
   console.info('Seeding token holdings...')
   await tokenHoldings(prisma)
   console.info('Token holdings seeded successfully ✓')
-
-  console.info('Seeding shillers...')
-  await shillers(prisma)
-  console.info('Shillers seeded successfully ✓')
 }
 
 Main()
